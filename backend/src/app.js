@@ -119,8 +119,8 @@ app.listen(Number(process.env.PORT || 8000), "127.0.0.1", (error) => {
     return;
   }
   console.log(
-    "게시판 시작 코드 http://127.0.0.1:" +
+    "스터디 Q&A 게시판 서버 http://127.0.0.1:" +
       (process.env.PORT || 8000) +
-      " — 인증 TODO 미완성",
+      " (JWT 인증·작성자 권한 적용)",
   );
 });
