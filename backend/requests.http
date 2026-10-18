@@ -1,0 +1,306 @@
+# 스터디 Q&A JWT 게시판 — 테스트 시나리오 T01~T17 요청 모음 (VS Code REST Client)
+# 사용법: 백엔드(8000)를 실행한 뒤 각 요청 위의 "Send Request"를 클릭합니다.
+# 오른쪽 창에서 HTTP 상태, 응답 헤더, JSON 본문을 확인하고 캡처합니다.
+# 위에서부터 순서대로 실행하세요. 앞 요청의 응답(토큰, 글 id)을 뒤 요청이 사용합니다.
+# 토큰 유효 시간은 기본 90초입니다. 401 TOKEN_EXPIRED가 나오면 [로그인] 요청을 다시 실행하세요.
+# 보고서 캡처에서는 토큰 원문을 가리세요.
+
+@base = http://127.0.0.1:8000/api
+
+### 서버 상태 → 200 {"status":"ok"}
+GET {{base}}/health
+
+
+########## [로그인] 이후 요청에 쓰는 토큰 준비 ##########
+
+### Alice 로그인 → 200
+# @name alice
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email":"alice@class.test","password":"Classroom!2026"}
+
+### Bob 로그인 → 200
+# @name bob
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email":"bob@class.test","password":"Classroom!2026"}
+
+
+########## T05 Alice 토큰으로 글 작성 후 /me → 201·authorId 1, /me는 Alice ##########
+# 이후 테스트가 이 글을 사용하므로 가장 먼저 실행합니다.
+
+### T05-1 Alice 글 등록 → 201, Location 헤더, authorId 1
+# @name alicePost
+POST {{base}}/posts
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"JWT의 sub는 왜 문자열인가요?","content":"명세에서 sub를 문자열로 넣으라고 하는 이유가 궁금합니다."}
+
+### T05-2 Alice /me → 200 {"id":1,"name":"Alice",...}
+GET {{base}}/me
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+
+########## T01 토큰 없이 목록 및 존재하는 글 상세 조회 → 200 ##########
+
+### T01-1 목록 (토큰 없음) → 200, 배열
+GET {{base}}/posts
+
+### T01-2 상세 (토큰 없음) → 200, 글 객체
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+
+########## T02 Alice 로그인 → 200, accessToken·expiresIn·user ##########
+
+### T02 Alice 정상 로그인 → 200 (화면 로그인 표시는 브라우저에서 확인)
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email":"alice@class.test","password":"Classroom!2026"}
+
+
+########## T03 잘못된 비밀번호·없는 이메일 → 401 INVALID_CREDENTIALS, 토큰 없음 ##########
+
+### T03-1 틀린 비밀번호 → 401 INVALID_CREDENTIALS
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email":"alice@class.test","password":"wrong-password"}
+
+### T03-2 없는 이메일 → 401 INVALID_CREDENTIALS
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{"email":"nobody@class.test","password":"Classroom!2026"}
+
+
+########## T04 토큰 없이 /me와 글 등록 → 각각 401 TOKEN_REQUIRED ##########
+
+### T04-1 토큰 없이 /me → 401 TOKEN_REQUIRED, 헤더 WWW-Authenticate: Bearer
+GET {{base}}/me
+
+### T04-2 토큰 없이 글 등록 → 401 TOKEN_REQUIRED
+POST {{base}}/posts
+Content-Type: application/json
+
+{"title":"토큰 없는 질문","content":"등록되면 안 됩니다."}
+
+
+########## T07 Bob이 Alice 글 수정 → 403 FORBIDDEN, 원문 유지 ##########
+
+### T07-1 Bob이 Alice 글 수정 → 403 FORBIDDEN
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"Bob이 바꾼 제목","content":"권한 없이 수정 시도"}
+
+### T07-2 재조회 → 200, 제목·내용·updatedAt이 T05-1과 같음
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+
+########## T08 Bob이 Alice 글 삭제 → 403 FORBIDDEN, 글 유지 ##########
+
+### T08-1 Bob이 Alice 글 삭제 → 403 FORBIDDEN
+DELETE {{base}}/posts/{{alicePost.response.body.id}}
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+### T08-2 재조회 → 200, 글이 그대로 있음
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+
+########## T09 서명 첫 글자를 바꾼 토큰 → 401 INVALID_TOKEN, 데이터 변경 없음 ##########
+# 아래 @tampered 값을 만듭니다:
+#   1) [로그인]의 Alice 로그인을 다시 실행하고 응답의 accessToken을 복사
+#   2) 토큰은 점(.)으로 나뉜 세 부분입니다. 세 번째 부분(서명)의 "첫 글자"를 다른 문자로 바꿉니다
+#   3) 바꾼 토큰 전체를 아래 @tampered = 뒤에 붙여넣습니다 (변조 토큰은 제출 전에 지워도 됩니다)
+@tampered = 여기에_서명_첫_글자를_바꾼_토큰을_붙여넣으세요
+
+### T09-1 변조 토큰 /me → 401 INVALID_TOKEN
+GET {{base}}/me
+Authorization: Bearer {{tampered}}
+
+### T09-2 변조 토큰 글 등록(POST) → 401 INVALID_TOKEN
+POST {{base}}/posts
+Content-Type: application/json
+Authorization: Bearer {{tampered}}
+
+{"title":"변조 토큰 질문","content":"등록되면 안 됩니다."}
+
+### T09-3 변조 토큰 글 수정(PUT) → 401 INVALID_TOKEN
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{tampered}}
+
+{"title":"변조 토큰 수정","content":"바뀌면 안 됩니다."}
+
+### T09-4 변조 토큰 글 삭제(DELETE) → 401 INVALID_TOKEN
+DELETE {{base}}/posts/{{alicePost.response.body.id}}
+Authorization: Bearer {{tampered}}
+
+### T09-5 재조회 → 200, 글 변경 없음 / 목록에 "변조 토큰 질문" 없음
+GET {{base}}/posts
+
+
+########## T12 Bob 글 등록 요청에 작성자 필드 추가 → 400 BAD_INPUT, 위조 글 없음 ##########
+
+### T12-1 authorId:1 추가 → 400 BAD_INPUT
+POST {{base}}/posts
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"위조 시도","content":"Alice 이름으로 쓰기","authorId":1}
+
+### T12-2 userId:1 추가 → 400 BAD_INPUT
+POST {{base}}/posts
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"위조 시도","content":"Alice 이름으로 쓰기","userId":1}
+
+### T12-3 목록 재조회 → "위조 시도" 글 없음
+GET {{base}}/posts
+
+
+########## T13 본인 토큰으로 잘못된 입력 → 400 BAD_INPUT, DB 변경 없음 ##########
+
+### T13-1 빈 제목 → 400 BAD_INPUT
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"","content":"내용은 있음"}
+
+### T13-2 공백만 있는 본문 → 400 BAD_INPUT
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"제목은 있음","content":"     "}
+
+### T13-3 제목 101자(길이 초과) → 400 BAD_INPUT
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가나다라마바사아자차가","content":"제목이 101자입니다."}
+
+### T13-4 재조회 → 200, 글 변경 없음
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+### (참고) Bob이 Alice 글에 공백 제목 → 403 (권한 검사가 입력 검사보다 먼저)
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"   ","content":"공백 제목"}
+
+
+########## T14 없는 글·잘못된 ID → 404 / 400 ##########
+
+### T14-1 없는 글 조회 → 404 NOT_FOUND
+GET {{base}}/posts/999999
+
+### T14-2 없는 글 수정 (정상 토큰) → 404 NOT_FOUND
+PUT {{base}}/posts/999999
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"없는 글","content":"수정 시도"}
+
+### T14-3 없는 글 삭제 (정상 토큰) → 404 NOT_FOUND
+DELETE {{base}}/posts/999999
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+### T14-4 잘못된 ID 형식 → 400 BAD_INPUT
+GET {{base}}/posts/abc
+
+### (참고) 토큰 없이 없는 글 수정 → 401 TOKEN_REQUIRED (인증이 글 존재 확인보다 먼저)
+PUT {{base}}/posts/999999
+Content-Type: application/json
+
+{"title":"없는 글","content":"수정 시도"}
+
+
+########## T17 무토큰 수정·삭제 → 401 / Bob 본인 작성·수정·삭제 → 성공 ##########
+
+### T17-1 토큰 없이 Alice 글 수정 → 401 TOKEN_REQUIRED
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+
+{"title":"무토큰 수정","content":"바뀌면 안 됩니다."}
+
+### T17-2 토큰 없이 Alice 글 삭제 → 401 TOKEN_REQUIRED
+DELETE {{base}}/posts/{{alicePost.response.body.id}}
+
+### T17-3 Bob 글 등록 → 201, authorId 2
+# @name bobPost
+POST {{base}}/posts
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"CORS와 프록시의 차이가 뭔가요?","content":"Vite 프록시를 쓰면 왜 CORS 설정이 필요 없나요?"}
+
+### T17-4 Bob 본인 글 수정 → 200
+PUT {{base}}/posts/{{bobPost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+{"title":"CORS와 프록시의 차이가 뭔가요? (수정)","content":"브라우저는 같은 출처로만 요청하고 Vite가 8000번으로 전달하기 때문인가요?"}
+
+### T17-5 Bob 본인 글 삭제 → 204, 본문 없음
+DELETE {{base}}/posts/{{bobPost.response.body.id}}
+Authorization: Bearer {{bob.response.body.accessToken}}
+
+
+########## T06 Alice 본인 글 수정·삭제 → 200 및 204, DB 반영 ##########
+# Alice 글을 삭제하므로 T07~T17 다음에 실행합니다.
+
+### T06-1 Alice 본인 글 수정 → 200, authorId·createdAt 유지, updatedAt 변경
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"JWT의 sub는 왜 문자열인가요? (해결)","content":"JWT 표준(RFC 7519)에서 sub를 문자열로 정의하기 때문입니다."}
+
+### T06-2 재조회 → 수정 내용 반영 확인
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+### T06-3 Alice 본인 글 삭제 → 204, 본문 없음
+DELETE {{base}}/posts/{{alicePost.response.body.id}}
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+### T06-4 삭제한 글 조회 → 404 NOT_FOUND
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+
+########## T10 실제 만료 → 401 TOKEN_EXPIRED ##########
+# 1) 백엔드 터미널에서 Ctrl+C로 종료하고 짧은 TTL로 재시작:  $env:TOKEN_TTL="10"; npm start
+# 2) [로그인]의 Alice 로그인 실행 → 응답 expiresIn이 10인지 확인
+# 3) T05-1로 글을 하나 만든 뒤 11초 이상 기다렸다가 아래를 실행
+# 4) 끝나면 백엔드를 종료하고 TTL을 되돌려 재시작:  Remove-Item Env:TOKEN_TTL; npm start
+
+### T10-1 만료 토큰 /me → 401 TOKEN_EXPIRED
+GET {{base}}/me
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+### T10-2 만료 토큰 글 수정 → 401 TOKEN_EXPIRED
+PUT {{base}}/posts/{{alicePost.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+{"title":"만료 토큰 수정","content":"바뀌면 안 됩니다."}
+
+### T10-3 만료 토큰 글 삭제 → 401 TOKEN_EXPIRED
+DELETE {{base}}/posts/{{alicePost.response.body.id}}
+Authorization: Bearer {{alice.response.body.accessToken}}
+
+### T10-4 재조회 → 글 변경 없음
+GET {{base}}/posts/{{alicePost.response.body.id}}
+
+
+# T11(로그아웃 후 /me), T15(서버 재시작 후 데이터 유지), T16(새로고침)은
+# 브라우저 화면과 Network 탭에서 확인합니다.
