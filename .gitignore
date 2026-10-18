@@ -1,0 +1,13 @@
+# dependencies / build output
+node_modules/
+dist/
+
+# secrets and local data (must not be committed)
+.env
+data/
+*.sqlite
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
