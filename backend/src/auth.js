@@ -90,6 +90,14 @@ export function currentUserId(req) {
   }
   return userId;
 }
+// BE-03: 수정·삭제 전에 호출됩니다. userId는 currentUserId()로 검증된 값, authorId는 DB에 저장된 작성자입니다.
+// 인증은 됐지만 본인 글이 아니면 403으로 거부하고, 이후의 입력 검사와 DB 변경은 실행되지 않습니다.
 export function assertOwner(userId, authorId) {
-  // TODO BE-03: 다른 작성자이면 403 FORBIDDEN. 현재는 검사하지 않습니다.
+  if (userId !== authorId) {
+    throw new ApiError(
+      403,
+      "FORBIDDEN",
+      "본인이 작성한 글만 수정·삭제할 수 있습니다.",
+    );
+  }
 }
