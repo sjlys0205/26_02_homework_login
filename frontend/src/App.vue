@@ -150,11 +150,14 @@ function me() {
             </div>
           </form>
           <div class="actions" v-else>
-            <button class="secondary" :disabled="busy" @click="me">
-              내 정보 조회
-            </button>
             <button type="button" class="secondary" @click="logout">
               로그아웃
+            </button>
+          </div>
+          <!-- T11: 로그아웃 상태에서도 눌러 토큰 없이 /me가 401이 되는지 확인할 수 있게 항상 표시 -->
+          <div class="actions">
+            <button type="button" class="secondary" :disabled="busy" @click="me">
+              내 정보 조회
             </button>
           </div>
           <p>
