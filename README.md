@@ -131,7 +131,7 @@ npm run preview
 
 ## 테스트 방법과 결과 요약
 
-- 실행한 검사 명령과 실행 위치: 저장소 루트에서 백엔드 실행 후 `python tools/check_api.py --mode final` → **All 40 checks passed**. 백엔드를 `$env:TOKEN_TTL="3"`으로 재시작한 뒤 `python tools/check_api.py --mode final --expiry` → **All 48 checks passed**.
+- 실행한 검사 명령과 실행 위치: backend 폴더에서 백엔드 실행 후 저장소 루트에서 `python tools/check_api.py --mode final`실행 → **All 40 checks passed**. 백엔드를 `$env:TOKEN_TTL="3"`으로 재시작한 뒤 같은 위치에서`python tools/check_api.py --mode final --expiry` → **All 48 checks passed**.
 - 수동 테스트: `backend/requests.http`(VS Code REST Client)로 T01~T09, T12~T14, T17, T06을 순차 실행하고, T02·T10·T11·T15·T16은 프론트엔드 빌드 화면과 브라우저 개발자 도구 Network 탭에서 추가 확인
 - Alice/Bob 권한 구분 확인 결과: Bob이 Alice 글을 수정·삭제하면 **403 FORBIDDEN**이고 재조회 시 글 유지 됨(T07, T08). 화면에서는 다른 사용자의 질문에 수정·삭제 버튼 표시 안 됨(별개로 백엔드에서 권한 검사는 진행함). Bob은 본인 글을 등록(201)·수정(200)·삭제(204)할 수 있음(T17).
 - HTTP 상태와 오류 code 확인: 200(목록·상세·로그인·/me·수정), 201(등록), 204(삭제), 400 `BAD_INPUT`(testCase: 빈 제목·공백 본문·101자 제목·authorId/userId 추가·잘못된 ID), 401 `INVALID_CREDENTIALS`·`TOKEN_REQUIRED`·`INVALID_TOKEN`·`TOKEN_EXPIRED`, 403 `FORBIDDEN`, 404 `NOT_FOUND`를 응답으로 확인
@@ -150,8 +150,8 @@ npm run preview
 ## AI 활용 요약과 참고 자료
 
 - AI 사용 여부: 사용
-- 도구와 사용 목적: Claude Code (Anthropic, 모델 Claude Opus 5.5). 구현 단계 계획, `auth.js`·`api.js`·`App.vue` 코드 작성 보조, 테스트 요청(`requests.http`) 구성, 테스트 캡처 검토, 보고서 초안 작성에 사용.
-- 반영 위치와 직접 수정·검증한 내용: AI의 보조로 작성한 코드를 단계별로 확인, 이후 작성된 코드에 대한 테스트(T01~T17, 검사 스크립트)는 직접 실행해보고 결과 정리 `requests.http`의 항목별 테스트는 과제 요구사항과 다시 비교 대조 해보고 관련 내용 주석 정리.
+- 도구와 사용 목적: Claude Code (Anthropic, 모델 Claude Opus 5.5). 구현 단계 계획, `auth.js`·`api.js`·`App.vue` 코드 작성 보조, 테스트 요청(`requests.http`) 구성, 테스트 캡처 검토, README, 보고서 초안 구성에 사용.
+- 반영 위치와 직접 수정·검증한 내용: AI의 보조로 작성한 코드를 단계별로 확인, 이후 작성된 코드에 대한 테스트(T01~T17, 검사 스크립트)는 직접 실행해보고 결과 정리, `requests.http`의 항목별 테스트는 과제 요구사항과 다시 비교 대조 해보고 관련 내용 주석 정리.
 - 상세 활용 기록: [보고서](docs/report.pdf)의 AI 활용 기록 부분
 - 참고한 수업 자료·외부 코드·공식 문서:
   - 수업 예제 `jwt-basic/auth.mjs` (토큰 발급·Bearer 읽기·검증 구조) → `backend/src/auth.js`
@@ -164,9 +164,9 @@ npm run preview
 ## 제출 확인
 
 - [x] README의 안내 문구를 실제 내용으로 교체했다.
-- [x] 새 폴더에 clone하여 README만으로 설치·환경설정·빌드·로컬 실행했다.
+- [ ] 새 폴더에 clone하여 README만으로 설치·환경설정·빌드·로컬 실행했다.
 - [x] 4173번 빌드 화면에서 API 연결과 전체 필수 기능을 확인했다.
 - [ ] GitHub에서 보고서와 증거 링크가 열린다.
-- [ ] 교수자가 저장소를 열람·복제할 수 있다.
+- [x] 교수자가 저장소를 열람·복제할 수 있다.
 - [x] 비밀 키·실제 토큰·DB·node_modules·.venv·target을 커밋하지 않았다.
 - [ ] 최종 push 후 저장소 URL과 제출 기준 커밋 SHA를 LMS에 제출했다.
